@@ -1,2 +1,2 @@
-# Ahmed_2020
-Data analysis for Ahmed et al. 2020
+# Ahmed_2022
+Data analysis for Ahmed et al. 2022
