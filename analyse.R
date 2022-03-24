@@ -3,7 +3,6 @@ library(data.table)
 library(fitdistrplus)
 library(gmp)
 library(mclust)
-library(umap)
 library(Hotelling)
 library(rootSolve)
 source("naiveBayes.R")
@@ -433,8 +432,6 @@ pil = list()
     points(x0,sampled$fibre_het[sampled$clust==0],pch=15+as.numeric(sampled$fibre_type[sampled$clust==0]),col=sampled$col[sampled$clust==0],cex=0.45)
     abline(h= median(threshmat[1,],na.rm=TRUE),col="grey",lwd=2,lty=2)
     abline(h=homogenate,col="grey",lwd=2,lty=3)
-    #abline(h= mean(100*threshmat[2,]),col="green",lwd=2,lty=2)
-    #legend("topleft",c("Median threshold estimate","Homogenate mutation level"),col="grey",lty=c(2,3))
    }
  }else{
   patplots[[snum]][["mutationlevel"]] = function(){plot.new()}
@@ -465,9 +462,6 @@ for (colname in c("adj_CI","adj_CIV","adj_porin")){
 
  if(length(sampled$caseno)>0&sum(sampled$biochem=="Deficient")>10&length(unique(as.character(sampled$biochem))>1)){
 
-   #hist(sampled$fibre_het,seq(-2.5,102.5,5),xlim=c(0,100),xlab = "Mutation level (%)",main=snum,cex.axis=1.55,cex.lab=1.55)
-   #points(sampled$fibre_het,rep(0,length(sampled$fibre_het)),col=sampled$colours,pch=3,lwd=3)
-   #abline(v=mean(sampled$hom_het),col="grey",lty=3,lwd=3)
    nt = naive_thresh(sampled,count1/countall,count2/countall,makeplot=TRUE)
    patplots[[snum]][["kde"]] = nt$kde
    patplots[[snum]][["naive"]] = nt$naive
@@ -483,8 +477,6 @@ for (colname in c("adj_CI","adj_CIV","adj_porin")){
  colnames(mat) = gsub("adj","raw",colnames(mat))
  rownames(mat) = dt$cellid
 
- #um = umap(mat)
- #plot(um$layout,pch=16,col=dt$colours,xlab="UMAP 1",ylab="UMAP 2",main=snum)
  dts[[s]] = dt
 
 
@@ -577,7 +569,7 @@ getSig3 = function(dat,A,B,N=5000,makeplot=FALSE){
 pdf("TestStatistic.pdf")
 #png("TestStat.png",width=1000,height=1000,pointsize=18)
 op = par(mai=c(1.1,1.1,0.9,0.1))
-combs = combn(colnames(threshsm),2)
+combs = combn(colnames(threshsm)[colnames(threshsm)!="Mean_All"],2)
 ncombs = dim(combs)[2]
 sigs = replicate(ncombs,NA)
 diffs = replicate(ncombs,NA)
@@ -595,81 +587,3 @@ sigs2 = sigs
 sigs2[is.na(diffs)] = NaN
 
 sigsadj = p.adjust(sigs2,method="hochberg")
-
-pats = sort(looknums)
-prep = matrix(data="",nrow = length(pats), ncol = length(pats))#
-stren = matrix(data="",nrow = length(pats), ncol = length(pats))#
-rownames(prep)=pats
-colnames(prep)=pats
-rownames(stren)=pats
-colnames(stren)=pats
-for(i in seq_along(combs[1,])){
-  cmb = combs[,i]
-  mdiff = median(threshes[[cmb[1]]]-threshes[[cmb[2]]])
-  prep[cmb[1],cmb[2]] = ifelse(is.na(diffs[i])|is.na(sigsadj[i]),"",sprintf("%0.4f",diffs[i]))
-  prep[cmb[2],cmb[1]] = ifelse(is.na(diffs[i])|is.na(sigsadj[i]),"",sprintf("%0.4f",sigs2[i]))
-  stren[cmb[1],cmb[2]] = ifelse(is.na(diffs[i]),"",sprintf("%0.4f",mdiff))
-  stren[cmb[2],cmb[1]] = ifelse(is.na(diffs[i]),"",sprintf("%0.4f",probs_diff[i]))
-}
-print("p-values")
-print(prep)
-print("probabilities")
-print(stren)
-
-write.table(stren,file="probabilities.txt",sep="\t",row.names=TRUE,col.names=NA,quote=TRUE)
-write.table(prep,file="pvalues.txt",sep="\t",row.names=TRUE,col.names=NA,quote=TRUE)
-meds = apply(threshes,2,median,na.rm=TRUE)
-IQRs = apply(threshes,2,IQR,na.rm=TRUE)
-vars = apply(threshes,2,var,na.rm=TRUE)
-print(meds)
-print(IQRs)
-print(vars)
-
-pats = sort(looknums)
-prep = matrix(data="",nrow = length(pats), ncol = length(pats))#
-stren = matrix(data="",nrow = length(pats), ncol = length(pats))#
-rownames(prep)=pats
-colnames(prep)=pats
-rownames(stren)=pats
-colnames(stren)=pats
-for(i in seq_along(combs[1,])){
-  cmb = combs[,i]
-  prep[cmb[1],cmb[2]] = ifelse(is.na(diffs[i])|is.na(sigsadj[i]),"",sprintf("%0.3f",diffs[i]))
-  prep[cmb[2],cmb[1]] = ifelse(is.na(diffs[i])|is.na(sigsadj[i]),"",sprintf("%0.3f",sigsadj[i]))
-}
-print(prep)
-
-write.table(prep,file="pvalues_adjusted.txt",sep="\t",row.names=TRUE,col.names=NA,quote=TRUE)
-
-wide = data.frame(p2=combs[2,],p1=combs[1,],diff=diffs,prop=probs_diff,p=sigsadj)
-
-wide2 = wide
-wide2$p1 = wide$p2
-wide2$p2 = wide$p1
-wide2$diff = -1*wide$diff
-
-wide=rbind(wide,wide2)
-
-wide$label = paste(formatC(wide$diff,2),"\n(",formatC(wide$p,3),")")
-wide$label_prop = paste(formatC(wide$diff,2),"\n(",formatC(wide$p,3),")","\n[",formatC(wide$prop,3),"]")
-wide = wide[!is.na(wide$diff),]
-
-# Adapted from Sarah's code
-library(ggplot2)
-
-pdf("Figure4B_proportion.pdf", width=9, height=9)
-
-ggplot(wide, aes(p1, p2)) + theme_bw() +
-  geom_raster(aes(fill=diff)) +
-  geom_text(aes(label=label_prop), size=5, colour="white") +
-  #scale_fill_continuous(low="white", high="red3", guide="colorbar",na.value=NA, name = "median\ndifference %")+
-  scale_fill_continuous(type = "viridis", name = "median\ndifference %") +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), text = element_text(size=18), 
-        line = element_blank(), panel.border = element_blank(), axis.title = element_blank()) 
-
-dev.off()
-
-plot(density(threshes[["P01"]]),main="",xlim=c(50,100),ylim=c(0,0.2),lwd=3,xlab="Mutation level (%)")
-points(density(threshes[["P04"]]),type="l",col="red",lwd=3)
-points(density(threshes[["P12"]]),type="l",col="green",lwd=3)
-legend("topleft",c("P01","P04","P12"),col=c("black","red","green"),lwd=3) 
