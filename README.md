@@ -1,7 +1,7 @@
 Data analysis to support the manuscript "Estimating the allele frequency threshold of the pathogenic mtDNA variant m.3243A>G tolerated by human myofibres" by Ahmed et al. (2022)
 
 * Open R.  
-* Install the required packages: ```install.packages(c("colortools","data.table","fitdistrplus","gmp","mclust","Hotelling","rootSolve"))```
+* Install the required packages: ```install.packages(c("colortools","data.table","fitdistrplus","gmp","mclust","Hotelling","rootSolve","beanplot"))```
 * Set this directory as working directory.
 * Open and run the code in analyse.R (e.g. type ```source("analyse.R")``` at the prompt and hit enter).
 
