@@ -492,25 +492,27 @@ threshdenses=threshdenses[,sort(colnames(threshdenses))]
 
 library(beanplot)
 
-
 par(op)
-#
 
 drops=list(c(),c("P02", "P05", "P10", "P14"),c("P02", "P05", "P06", "P10", "P14", "P18"))
 d = drops[3]
 threshsm = threshes[,!colnames(threshes)%in%d[[1]]]
-threshsm[["Mean_All"]] = apply(threshsm,1,median,na.rm=TRUE)
-patplots[[snum]][["thresplot"]] = function(){
+threshsm[["All"]] = apply(threshsm,1,median,na.rm=TRUE)
+threshplot = function(){
  op = par(mai=c(1.5,1.75,0.5,0.5))
  stripchart(threshsm,vertical=TRUE,method="jitter",jitter=0.2,pch=16,col=rgb(1,0,0,0.05),ylab="Mutation level threshold (%)",ylim=c(0,100),main="",cex.axis=1.75,cex.lab=2.55)
  beanplot(threshsm,add=TRUE,outline=FALSE,pars=list(boxwex=0.5),cex.axis=1.25,cex.lab=2.55,col=rgb(0,0,0,0),ll=0,wd=1.5,beanlinewd=0.5,beanlines="median",overallline="median",maxwidth=1.0,axes=FALSE)
  par(op)
 }
-patplots[[snum]][["thresplot"]]()
+threshplot()
 
 dev.off()
 print(summary(threshsm))
 apply(threshsm,2,IQR,na.rm=TRUE)
+
+png("OverallThreshold.png",width=1000,height=1000,pointsize=18)
+ threshplot()
+dev.off()
 
 bthresh = function(threshes,A,B){
  N = dim(threshes)[1]
