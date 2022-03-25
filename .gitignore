@@ -39,3 +39,4 @@ vignettes/*.pdf
 .Renviron
 *.txt
 *.pdf
+OverallThreshold.png

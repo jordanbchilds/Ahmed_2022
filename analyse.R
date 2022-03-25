@@ -5,6 +5,7 @@ library(gmp)
 library(mclust)
 library(Hotelling)
 library(rootSolve)
+library(beanplot)
 source("naiveBayes.R")
 
 threshFromScratch = function(dtf,predgmm,c1=0.5,c2=0.5,makeplot=FALSE){
@@ -126,7 +127,7 @@ threshdenses=data.frame(row=1:NREPS)
 
 hiclust = FALSE
 
-looknums = sort(nums[grepl("P",nums)])
+looknums = sprintf("P%02d",1:17)
 looknums = looknums[looknums%in%dat$sno]
 
 unique(dat$caseno)
@@ -150,7 +151,6 @@ write.table(dat,"IFdata.txt",sep="\t",quote=FALSE,row.names=FALSE)
 
 dat$fibre_het[dat$sno=="P06"] = NA
 dat = dat[!dat$sno%in%c("D11","D19"),]
-looknums = sprintf("P%02d",1:17)
 
 gmms = list()
 
@@ -489,8 +489,6 @@ threshdenses$row=NULL
 
 threshes=threshes[,sort(colnames(threshes))]
 threshdenses=threshdenses[,sort(colnames(threshdenses))]
-
-library(beanplot)
 
 par(op)
 
