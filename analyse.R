@@ -569,7 +569,7 @@ getSig3 = function(dat,A,B,N=5000,makeplot=FALSE){
 pdf("TestStatistic.pdf")
 #png("TestStat.png",width=1000,height=1000,pointsize=18)
 op = par(mai=c(1.1,1.1,0.9,0.1))
-combs = combn(colnames(threshsm)[colnames(threshsm)!="Mean_All"],2)
+combs = combn(colnames(threshsm)[colnames(threshsm)!=All"],2)
 ncombs = dim(combs)[2]
 sigs = replicate(ncombs,NA)
 diffs = replicate(ncombs,NA)
