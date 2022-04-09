@@ -569,7 +569,7 @@ getSig3 = function(dat,A,B,N=5000,makeplot=FALSE){
 pdf("TestStatistic.pdf")
 #png("TestStat.png",width=1000,height=1000,pointsize=18)
 op = par(mai=c(1.1,1.1,0.9,0.1))
-combs = combn(colnames(threshsm)[colnames(threshsm)!=All"],2)
+combs = combn(colnames(threshsm)[colnames(threshsm)!="All"],2)
 ncombs = dim(combs)[2]
 sigs = replicate(ncombs,NA)
 diffs = replicate(ncombs,NA)
@@ -587,3 +587,11 @@ sigs2 = sigs
 sigs2[is.na(diffs)] = NaN
 
 sigsadj = p.adjust(sigs2,method="hochberg")
+
+pdf("Mutloads.pdf",width=18,height=18,pointsize=20)
+dml = dat[!is.na(dat$fibre_het),]
+ op = par(mai=c(1.5,1.75,0.5,0.5))
+ stripchart(dml$fibre_het~dml$caseno,vertical=TRUE,method="jitter",jitter=0.15,pch=16,col=rgb(1,0,0,0.25),ylab="Mutation level (%)",ylim=c(0,100),main="",cex.axis=1.75,cex.lab=2.55)
+ beanplot(dml$fibre_het~dml$caseno,add=TRUE,outline=FALSE,pars=list(boxwex=1.5),cex.axis=1.25,cex.lab=2.55,col=rgb(0,0,0,0),ll=0,wd=3.5,beanlinewd=0.5,beanlines="median",overallline="median",maxwidth=1.0,axes=FALSE)
+ par(op)
+dev.off()
