@@ -182,6 +182,8 @@ for(snum in looknums){
  dt = dat[(dat$sno==s),]
  dt$biochem = "Normal"
  ct = data.frame(dat)[(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch)),]
+ #ct = data.frame(dat)[(dat$controls=="control"),]
+
 
  minimat = makemini(dt)
  mb = Mclust(minimat,1:2)
@@ -200,7 +202,8 @@ for(snum in looknums){
  normclust = 1
  if(mb$G==2){
    z2 = samplerows(minimat[mb$z[,2]>0.5,],Nsamps)
-   if((sum(diffdfs(ctsA,z1)>diffdfs(ctsA,z2))/Nsamps)>0.5){normclust = 2}
+   if((sum(diffdfs(ctsA,z1)>diffdfs(ctsA,z2))/Nsamps)>0.5){normclust = 2} # Cluster 2 is closest to controls, therefore normal
+   if((sum(mb$z[,2]>0.5)/length(mb$z[,2]))<0.1){normclust = 1} # Cluster 2 is less than 10% of total fibres, therefore deficient
    ctrlctrl = diffdfs(ctsA,ctsB)
    #res = hotelling.test(ctvals,patvals,perm=TRUE)
    #print(res)
