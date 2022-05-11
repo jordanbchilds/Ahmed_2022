@@ -37,6 +37,9 @@ usecols = c("adj_CI","adj_CIV","adj_porin")
 dat = fread("rawdat_a.csv",sep=",",stringsAsFactors=FALSE)
 dat = dat[nchar(dat$caseno)==3,]
 
+#dat$caseno[dat$caseno=="P08"]=paste(dat$caseno[dat$caseno=="P08"],dat$Batch[dat$caseno=="P08"],sep="_")
+dat = dat[!((dat$caseno=="P08")&(dat$Batch==3)),]
+
 probexact = function(ndef,nrand,allfibs,deficient) chooseZ(deficient,ndef)*chooseZ(allfibs-deficient,nrand-ndef)/chooseZ(allfibs,nrand)
 probatleast = function(ndef,nrand,allfibs,deficient) sum(probexact(ndef:deficient,nrand,allfibs,deficient))
 samplesneeded = function(ndef,allfibs,deficient){
@@ -92,7 +95,9 @@ for(case in sort(unique(dat$caseno))){
 
 dat$sno = dat$caseno
 
-dat$cellid = paste(dat$sno,sprintf("%04d",dat$Fibre),sep="_")
+dat$cellid = paste(dat$sno,sprintf("%04d",dat$Fibre),dat$Batch,sep="_")
+# Discard repeated occurences of cellid
+dat = dat[match(unique(dat$cellid),dat$cellid),]
 
 axrange = c(-15,5)
 linesat = c(-6,-4.5,-3,0,3,4.5,6)
@@ -127,13 +132,13 @@ threshdenses=data.frame(row=1:NREPS)
 
 hiclust = FALSE
 
-looknums = sprintf("P%02d",1:17)
-looknums = looknums[looknums%in%dat$sno]
+#looknums = sprintf("P%02d",1:17)
+#looknums = looknums[looknums%in%dat$sno]
+
+looknums = sort(unique(dat$caseno))
+looknums = looknums[!grepl("C",looknums)]
 
 unique(dat$caseno)
-
-# Discard repeated occurences of controls
-dat = dat[match(unique(dat$cellid),dat$cellid),]
 
 # Discard zeros
 dat = dat[(dat$raw_CIV!=0)&(dat$raw_porin!=0)&(dat$raw_CI!=0),]
@@ -181,9 +186,8 @@ for(snum in looknums){
  s = as.character(snum)
  dt = dat[(dat$sno==s),]
  dt$biochem = "Normal"
- ct = data.frame(dat)[(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch)),]
- #ct = data.frame(dat)[(dat$controls=="control"),]
 
+ ct = data.frame(dat)[(dat$controls=="control"),]
 
  minimat = makemini(dt)
  mb = Mclust(minimat,1:2)
@@ -201,8 +205,10 @@ for(snum in looknums){
  z1 = samplerows(patvals,Nsamps)
  normclust = 1
  if(mb$G==2){
+   #print((sum(mb$z[,2]>0.5)/length(mb$z[,2])))
    z2 = samplerows(minimat[mb$z[,2]>0.5,],Nsamps)
    if((sum(diffdfs(ctsA,z1)>diffdfs(ctsA,z2))/Nsamps)>0.5){normclust = 2} # Cluster 2 is closest to controls, therefore normal
+   if((sum(mb$z[,1]>0.5)/length(mb$z[,1]))<0.1){normclust = 2} # Cluster 1 is less than 10% of total fibres, therefore deficient
    if((sum(mb$z[,2]>0.5)/length(mb$z[,2]))<0.1){normclust = 1} # Cluster 2 is less than 10% of total fibres, therefore deficient
    ctrlctrl = diffdfs(ctsA,ctsB)
    #res = hotelling.test(ctvals,patvals,perm=TRUE)
@@ -279,8 +285,8 @@ pil = list()
    comp = gsub("adj_","",ycol)
    x = dt$adj_porin
    y = dt[[paste("adj",comp,sep="_")]]
-  cx = dat$adj_porin[(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch))]
-  cy = dat[[paste("adj",comp,sep="_")]][(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch))]
+   cx = ct$adj_porin
+   cy = ct[[paste("adj",comp,sep="_")]]
   rx = c(-0.75,1.75)
   ry = rx
 
@@ -316,8 +322,8 @@ pil = list()
    comp = "CIV"
    x = dt$adj_CI
    y = dt[[paste("adj",comp,sep="_")]]
-  cx = dat$adj_CI[(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch))]
-  cy = dat[[paste("adj",comp,sep="_")]][(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch))]
+   cx = ct$adj_CI
+   cy = ct[[paste("adj",comp,sep="_")]]
   rx = c(-0.75,1.75)
   ry = rx
 
@@ -448,7 +454,7 @@ layout(matrix(c(1,1,2,2,3,3,
 
 for (colname in c("adj_CI","adj_CIV","adj_porin")){
    x = dt[[colname]]
-  cx = dat[[colname]][(dat$controls=="control")&(dat$Batch%in%unique(dt$Batch))]
+  cx = ct[[colname]]
 
   densx = density(x)
   denscx = density(cx)
