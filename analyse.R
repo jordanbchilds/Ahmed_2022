@@ -604,3 +604,8 @@ dml = dat[!is.na(dat$fibre_het),]
  beanplot(dml$fibre_het~dml$caseno,add=TRUE,outline=FALSE,pars=list(boxwex=1.5),cex.axis=1.25,cex.lab=2.55,col=rgb(0,0,0,0),ll=0,wd=3.5,beanlinewd=0.5,beanlines="median",overallline="median",maxwidth=1.0,axes=FALSE)
  par(op)
 dev.off()
+
+defs = aggregate(as.character(dts$biochem)=="Deficient",by=list(dts$caseno),sum)
+fibs = aggregate(as.character(dts$biochem)=="Deficient",by=list(dts$caseno),length)
+deffracs = data.frame(caseno=defs[,1],deficient=100*defs$x/fibs$x)
+write.table(deffracs,"PropDef.txt",sep="\t",quote=FALSE,row.names=FALSE)
