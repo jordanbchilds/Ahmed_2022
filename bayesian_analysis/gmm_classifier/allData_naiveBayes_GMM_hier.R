@@ -85,7 +85,7 @@ inputs = list()
   } # chans
 }
 
-ncores = detectCores() - 1 
+ncores = 2
 cl  = makeCluster(ncores) 
 {
   clusterEvalQ(cl, {
