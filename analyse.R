@@ -35,7 +35,7 @@ usecols = c("adj_CI","adj_CIV","adj_porin")
 # https://towardsdatascience.com/unsupervised-machine-learning-clustering-analysis-d40f2b34ae7e
 
 dat = fread("rawdat_a.csv",sep=",",stringsAsFactors=FALSE)
-dat = dat[nchar(dat$caseno)==3,]
+dat = dat[nchar(dat$caseno)==3,] # this line does nothing
 
 #dat$caseno[dat$caseno=="P08"]=paste(dat$caseno[dat$caseno=="P08"],dat$Batch[dat$caseno=="P08"],sep="_")
 dat = dat[!((dat$caseno=="P08")&(dat$Batch==3)),]
