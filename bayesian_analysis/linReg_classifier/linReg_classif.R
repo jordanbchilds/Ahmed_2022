@@ -58,12 +58,13 @@ inference = function(input){
     rate_tau = 1
     shape_gamma = 20 # irrelevant - will only sample from prior
     rate_gamma = 10 # irrelevant - will only sample from prior
+    
     N_syn = 1e4
-    h = 0.01
+    X_syn = seq(0, max(c(ctrl_mat[,1], pat_mat[,1]))*1.5, length.out=N_syn)
     
     ## control inference
     data_ctrl = list( Xobs=ctrl_mat[,1], Yobs=ctrl_mat[,2], N=Nctrl, Nsyn=N_syn,
-                      Xsyn=seq(0, max(c(ctrl_mat[,1], pat_mat[,1]))*1.5, length.out=N_syn),
+                      Xsyn=X_syn,
                       mu_m=m_est, tau_m=tau_m, mu_c=c_est, tau_c=tau_c,
                       shape_tau=shape_tau, rate_tau=rate_tau,
                       shape_gamma=shape_gamma, rate_gamma=rate_gamma,
@@ -107,10 +108,10 @@ inference = function(input){
     rate_gamma = (gamma_mode+sqrt(gamma_mode^2+4*gamma_mode^2))/(2*gamma_sd^2)
     shape_gamma = 1+gamma_mode*rate_gamma
     
-    N_syn = 1e4
+
     
     data_pat = list(Xobs=pat_mat[,1], Yobs=pat_mat[,2], N=Npat, Nsyn=N_syn,
-                    Xsyn=seq(0, max(c(ctrl_mat[,1], pat_mat[,1]))*1.5, length.out=N_syn),
+                    Xsyn=X_syn, 
                     mu_m=m_est, tau_m=tau_m, 
                     mu_c=c_est, tau_c=tau_c,
                     shape_tau=tau_shape, rate_tau=tau_rate, 
@@ -140,17 +141,26 @@ inference = function(input){
     posterior_ctrl_names = colnames(posterior_ctrl)
     post_ctrl = posterior_ctrl[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
     postpred_ctrl = colQuantiles( posterior_ctrl[,grepl("Ysyn", posterior_ctrl_names)], probs=c(0.025, 0.5, 0.975) )
+    postpred_ctrl = cbind(X_syn, postpred_ctrl)
+    colnames(postpred_ctrl) = c("mitochan", "lwr", "mid", "upr")
     
     prior_ctrl_names = colnames(prior_ctrl)
     priorpred_ctrl = colQuantiles(prior_ctrl[, grepl("Ysyn", prior_ctrl_names)], probs=c(0.025,0.5,0.975))
+    priorpred_ctrl = cbind(X_syn, priorpred_ctrl)
+    colnames(priorpred_ctrl) = c("mitochan", "lwr", "mid", "upr")
     prior_control = prior_ctrl[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
     
     posterior_pat_names = colnames(posterior_pat)
     post_pat = posterior_pat[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
     postpred_pat = colQuantiles(posterior_pat[,grepl("Ysyn", posterior_pat_names)], probs=c(0.025,0.5,0.975))
+    postpred_pat = cbind(X_syn, postpred_pat)
+    colnames(postpred_pat) = c("mitochan", "lwr", "mid", "upr")
     
     prior_pat_names = colnames(prior_pat)
     priorpred_pat = colQuantiles(prior_pat[,grepl("Ysyn", prior_pat_names)], probs=c(0.025,0.5,0.975))
+    priorpred_pat = cbind(X_syn, priorpred_pat)
+    colnames(priorpred_pat) = c("mitochan", "lwr", "mid", "upr")
+    
     prior_patient = prior_pat[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
     
     ctrl_list = list(post=post_ctrl, postpred=postpred_ctrl, 
@@ -167,9 +177,9 @@ inference = function(input){
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 2000
-  input0$MCMCBurnin = 1000
-  input0$MCMCThin = 50
+  input0$MCMCOut = 50 # 2000
+  input0$MCMCBurnin = 10 # 1000
+  input0$MCMCThin = 1 # 50
   input0$n.chains = 1
 
     for(chan in cord){

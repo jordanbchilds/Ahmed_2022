@@ -86,12 +86,9 @@ getData_mats = function(chan, mitochan="raw_porin",
                         data_transform=NULL,
                         get_patindex=FALSE, one_matrix=FALSE){
   
-  data = read.csv("../rawdat_a.csv", stringsAsFactors=FALSE, header=TRUE)
+  data = read.csv(file.path("..", "rawdat_a.csv"), 
+                  stringsAsFactors=FALSE, header=TRUE)
 
-  sbj = sort(unique(data$caseno))
-  crl = grep("C", sbj, value = TRUE)
-  pts = grep("P", sbj, value=TRUE)
-  
   Xctrl = data[grepl("C", data$caseno), mitochan]
   Yctrl = data[grepl("C", data$caseno), chan]
   ctrl_mat = cbind( Xctrl, Yctrl )
@@ -102,6 +99,10 @@ getData_mats = function(chan, mitochan="raw_porin",
     ind = 1L
     if(is.null(pts)){
       Ypts = list()
+      sbj = sort(unique(data$caseno))
+      crl = grep("C", sbj, value = TRUE)
+      pts = grep("P0.", sbj, value=TRUE)
+      
       for(pat in pts){
         Xpat = data[data$caseno == pat, mitochan]
         Ypat = data[data$caseno == pat, chan]
@@ -143,97 +144,6 @@ getData_mats = function(chan, mitochan="raw_porin",
   }
 }
 
-getData_chanpats = function(fulldat, get_Npats=FALSE){
-  froot = gsub(".RAW.txt","",fulldat)
-  mchans = c("Ch1","Ch2","Ch3","Ch4","Area")
-  if(grepl(".TCF.",fulldat)){# attention confocal - swap channels
-    chans=c("LAMA1","VDAC1","MTCO1","NDUFB8","Area") # swapped MTCO1 and VDAC1 for confocal
-  }else{
-    chans=c("LAMA1","MTCO1","VDAC1","NDUFB8","Area") # standard for CD7
-  }
-  names(chans) = mchans
-  
-  dat = read.delim(file.path("../../BootStrapping",fulldat),stringsAsFactors=FALSE)
-  dat$Channel = chans[dat$Channel]
-  write.table(dat,gsub(".RAW", ".RAW_ren", fulldat),row.names=FALSE,quote=FALSE,sep="\t")
-  
-  cord = c("NDUFB8","MTCO1","VDAC1")
-  chlabs = c("CI","CIV","OMM")
-  names(chlabs) = cord
-  mitochan = "VDAC1"
-  correctnpc = TRUE
-  updatechans = FALSE
-  dat = getData(gsub(".RAW", ".RAW_ren", fulldat), cord,
-                mitochan = mitochan, updatechans = updatechans, correctnpc = correctnpc)
-  
-  dat$fn = gsub("_.0", "", dat$filename)
-  dat$pch = paste(dat$fn,dat$ch,sep="_")
-  # Merge different regions of the same section
-  dat$fn = gsub("_R1","",dat$fn)
-  dat$fn = gsub("_R2","",dat$fn)
-  
-  # grabbing and seperating ctrls and patients
-  sbj = sort(unique(dat$fn))
-  crl = grep("C._H", sbj, value = TRUE)
-  pts = grep("P.", sbj, value = TRUE)
-  
-  if(get_Npats){
-    Npats = double(length(pts))
-    names(Npats) = pts
-    for(pat in pts){
-      for(chan in c("NDUFB8", "MTCO1")){
-        Npats[pat] = nrow(getData_mats(fulldat, chan=chan, pts=pat, data_transform=NULL)$pts)
-      }
-    }
-    return(list(channels=c("NDUFB8", "MTCO1"), patients=pts, controls=crl, Npats=Npats))
-  }
-  
-  list(channels=c("NDUFB8", "MTCO1"), patients=pts, controls=crl)
-}
-
-
-getData_df = function(fulldat, chan, mitochan="VDAC1"){
-  froot = gsub(".RAW.txt","",fulldat)
-  correctnpc = TRUE
-  updatechans = FALSE
-  
-  data = getData(paste0("./",gsub(".RAW", ".RAW_ren", fulldat)), c(chan, mitochan),
-                 mitochan = mitochan, updatechans = updatechans, correctnpc = correctnpc)
-  
-  data$fn = gsub("_.0", "", data$filename)
-  data$pch = paste(data$fn, data$ch, sep="_")
-  data$fn = gsub("_R1","",data$fn)
-  data$fn = gsub("_R2","",data$fn)
-  
-  sbj = sort(unique(data$fn))
-  crl = grep("C._H", sbj, value = TRUE)
-  pts_all = grep("P._", sbj, value=TRUE)
-  
-  log_mitochan = vector("numeric")
-  log_chan = vector("numeric")
-  subject_id = vector("character")
-  
-  for(con in crl){
-    ctrl_data = data[(data$fn==con)&(data$type=="Mean intensity"), ]
-    x = ctrl_data$value[ctrl_data$channel==mitochan]
-    y = ctrl_data$value[ctrl_data$channel==chan]
-    log_mitochan = c(log_mitochan, log(x))
-    log_chan = c(log_chan, log(y))
-    subject_id = c(subject_id, rep(con, length(x)))
-  }
-  for(pat in pts_all){
-    pat_data = data[(data$fn==pat)&(data$type=="Mean intensity"), ]
-    x = pat_data$value[pat_data$channel==mitochan]
-    y = pat_data$value[pat_data$channel==chan]
-    log_mitochan = c(log_mitochan, log(x))
-    log_chan = c(log_chan, log(y))
-    subject_id = c(subject_id, rep(pat, length(x))  )
-  }
-  
-  return( data.frame(sbj = subject_id, mitochan=log_mitochan, chan=log_chan))
-}
-
-
 ##
 ## READ & SAVERS AOUTPUT
 ##
@@ -263,9 +173,10 @@ output_saver = function(outroot, output, folder, pat_only=FALSE){
   }
   
 }
-output_reader = function(folder, fulldat, chan, pat="CONTROL", out_type){
-  outroot = paste(gsub(".RAW.txt", "", fulldat), chan, gsub("_",".", pat), sep="_")
-  fp = file.path("./Output", folder, paste0(outroot, "_", out_type, ".txt"))
+
+output_reader = function(folder, chan, pat="CONTROL", out_type){
+  outroot = paste(chan, pat, sep="_")
+  fp = file.path("Output", folder, paste0(outroot, "_", out_type, ".txt"))
   if(file.exists(fp)) return( read.table(fp, header=TRUE, stringsAsFactors=FALSE) )
   else stop(paste(fp, "file does not exist"))
 }
@@ -287,13 +198,13 @@ classif_plot = function(ctrl_data, pat_data, classifs_pat, chan, mitochan="VDAC1
     par(op)
 }
   
-MCMCplot = function(folder, fulldat, chan, pat="CONTROL", title="", lag=20){
-    post = output_reader(folder, fulldat, chan, pat, out_type="POST")
+MCMCplot = function(folder, chan, pat="CONTROL", title="", lag=20){
+    post = output_reader(folder, chan, pat, out_type="POST")
     
     if(pat=="CONTROL"){
-      prior = read.table(file.path("Output", folder, paste(gsub(".RAW.txt", "", fulldat), chan, "CONTROL", "PRIOR.txt", sep="_")), header=TRUE, stringsAsFactors = FALSE)
+      prior = read.table(file.path("Output", folder, paste(chan, "CONTROL", "PRIOR.txt", sep="_")), header=TRUE, stringsAsFactors = FALSE)
     } else {
-      prior = output_reader(folder, fulldat, chan, pat, out_type="PRIOR")
+      prior = output_reader(folder, chan, pat, out_type="PRIOR")
     }
     
     col.names = colnames(post)
@@ -322,7 +233,7 @@ priorpost = function(ctrl_data, pat_data=NULL, priorpred, postpred,
                      classif=NULL, 
                      chan, mitochan="VDAC1", title="", xlims=NULL, ylims=NULL){
 
-    Xsyn = seq(min(ctrl_data[,1])*0.75, max(ctrl_data[,1])*1.25, length.out=1000)
+    Xsyn = seq(0, max(c(ctrl_data[,1], pat_data[,1]))*1.5, length.out=1e4)
     
     op = par(mfrow=c(1,2))
     plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1),
