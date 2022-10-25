@@ -177,9 +177,9 @@ inference = function(input){
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 50 # 2000
-  input0$MCMCBurnin = 10 # 1000
-  input0$MCMCThin = 1 # 50
+  input0$MCMCOut = 2000
+  input0$MCMCBurnin = 1000
+  input0$MCMCThin = 50
   input0$n.chains = 1
 
     for(chan in cord){
