@@ -1,7 +1,7 @@
 library(rjags)
 library(MASS)
 library(parallel)
-source("./helper_functions.R", local=TRUE)
+source("helper_functions.R", local=TRUE)
 
 folder = "linReg_classifier"
 
@@ -12,14 +12,13 @@ modelstring = "
  model {
   # Likelihood of data given model parameters
   for (i in 1:N){
+   Yobs[i] ~ dnorm(m*Xobs[i] + c, tau_hat[i])
+   tau_hat[i] = ifelse(class[i]==1, tau_notctrl, tau_ctrl)
    class[i] ~ dbern(probdiff)
-   Yobs[i] ~ dnorm(Y[i], tau_hat[i])
-   Y[i] = m*Xobs[i] + c
-   tau_hat[i] = ifelse(class[i]==1, tau_ctrl, tau_notctrl)
   }
   for(j in 1:Nsyn){
-   Ysyn[j] ~ dnorm(Ys[j], tau_ctrl)
-   Ys[j] <- m*Xsyn[j] + c
+   Ysyn_norm[j] ~ dnorm(m*Xsyn[j]+c, tau_ctrl)
+   Ysyn_def[j] ~ dnorm(m*Xsyn[j]+c, tau_notctrl)
   }
   # Specify prior beliefs about parameters
   m ~ dnorm(mu_m, tau_m)
@@ -28,7 +27,7 @@ modelstring = "
   notctrl_var ~ dgamma(shape_gamma, rate_gamma)
   tau_notctrl = 1/notctrl_var
   p ~ dbeta(alpha, beta)
-  probdiff = ifelse(ctrl_ind==1, 1, p)
+  probdiff = ifelse(ctrl_ind==1, 0, p)
  }
 "
 
@@ -80,9 +79,9 @@ inference = function(input){
     
     update(model_ctrl,n.iter=MCMCBurnin)
     output_ctrl = coda.samples(model=model_ctrl, n.iter=MCMCOut*MCMCThin,thin=MCMCThin,
-                               variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn","class","probdiff"))
+                               variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn_norm","Ysyn_def", "class","probdiff"))
     output_ctrl_prior = coda.samples(model=model_ctrl_priorpred, n.iter=MCMCOut,thin=1,
-                                     variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn","probdiff"))
+                                     variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn_norm","Ysyn_def","probdiff"))
     
     posterior_ctrl = as.data.frame(output_ctrl[[1]])
     prior_ctrl = as.data.frame(output_ctrl_prior[[1]])
@@ -91,13 +90,13 @@ inference = function(input){
     
     ### patient inference
     # pateint priors
-    flex = 0.01
+    flex = 0.1
     c_est = mean(posterior_ctrl$c)
     tau_c = flex/(sd(posterior_ctrl$c)^2)
     m_est = mean(posterior_ctrl$m)
     tau_m = flex/(sd(posterior_ctrl$m)^2)
     #delta = 1.5*as.numeric(quantile(posterior_ctrl$tau_ctrl,0.5)) # Choose this value so that Tiago's replication dataset never predicts over-expression of CI or CIV
-    delta = 0
+    delta = 0.0
     tau_mean = mean(posterior_ctrl$tau_ctrl) + delta # Precision tau = (1/sd)^2
     tau_sd = sd(posterior_ctrl$tau_ctrl) # Deviation from prior tau should require a lot of contradictory data
     tau_shape = (tau_mean^2)/(tau_sd^2)
@@ -107,8 +106,6 @@ inference = function(input){
     gamma_sd = 10 # ctrl sampled from prior so can ignore the ctrl posterior
     rate_gamma = (gamma_mode+sqrt(gamma_mode^2+4*gamma_mode^2))/(2*gamma_sd^2)
     shape_gamma = 1+gamma_mode*rate_gamma
-    
-
     
     data_pat = list(Xobs=pat_mat[,1], Yobs=pat_mat[,2], N=Npat, Nsyn=N_syn,
                     Xsyn=X_syn, 
@@ -128,9 +125,9 @@ inference = function(input){
     update(model_pat, n.iter=MCMCBurnin)
     #converge_pat=coda.samples(model=model_pat,variable.names=c("m","c","tau_par","class","probdiff"),n.iter=MCMCUpdates_Report,thin=MCMCUpdates_Thin)
     output_pat_post = coda.samples(model=model_pat, n.iter=MCMCOut*MCMCThin, thin=MCMCThin,
-                            variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn","class","probdiff"))
+                            variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn_norm", "Ysyn_def","class","probdiff"))
     output_pat_prior = coda.samples(model=model_pat_priorpred,n.iter=MCMCOut, thin=1,
-                                      variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn","probdiff"))
+                                      variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn_norm", "Ysyn_def","probdiff"))
     
     posterior_pat = as.data.frame(output_pat_post[[1]])
     prior_pat = as.data.frame(output_pat_prior[[1]])
@@ -140,26 +137,30 @@ inference = function(input){
     
     posterior_ctrl_names = colnames(posterior_ctrl)
     post_ctrl = posterior_ctrl[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
-    postpred_ctrl = colQuantiles( posterior_ctrl[,grepl("Ysyn", posterior_ctrl_names)], probs=c(0.025, 0.5, 0.975) )
-    postpred_ctrl = cbind(X_syn, postpred_ctrl)
-    colnames(postpred_ctrl) = c("mitochan", "lwr", "mid", "upr")
+    postpred_ctrl_norm = colQuantiles( posterior_ctrl[,grepl("Ysyn_norm", posterior_ctrl_names)], probs=c(0.025, 0.5, 0.975) )
+    postpred_ctrl_def = colQuantiles( posterior_ctrl[,grepl("Ysyn_def", posterior_ctrl_names)], probs=c(0.025, 0.5, 0.975) )
+    postpred_ctrl = cbind(X_syn, postpred_ctrl_norm, postpred_ctrl_def)
+    colnames(postpred_ctrl) = c("mitochan", "lwr_norm", "mid_norm", "upr_norm", "lwr_def", "mid_def", "upr_def")
     
     prior_ctrl_names = colnames(prior_ctrl)
-    priorpred_ctrl = colQuantiles(prior_ctrl[, grepl("Ysyn", prior_ctrl_names)], probs=c(0.025,0.5,0.975))
-    priorpred_ctrl = cbind(X_syn, priorpred_ctrl)
-    colnames(priorpred_ctrl) = c("mitochan", "lwr", "mid", "upr")
+    priorpred_ctrl_norm = colQuantiles(prior_ctrl[, grepl("Ysyn_norm", prior_ctrl_names)], probs=c(0.025,0.5,0.975))
+    priorpred_ctrl_def = colQuantiles(prior_ctrl[, grepl("Ysyn_def", prior_ctrl_names)], probs=c(0.025,0.5,0.975))
+    priorpred_ctrl = cbind(X_syn, priorpred_ctrl_norm, priorpred_ctrl_def)
+    colnames(priorpred_ctrl) = c("mitochan", "lwr_norm", "mid_norm", "upr_norm", "lwr_def", "mid_def", "upr_def")
     prior_control = prior_ctrl[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
     
     posterior_pat_names = colnames(posterior_pat)
     post_pat = posterior_pat[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
-    postpred_pat = colQuantiles(posterior_pat[,grepl("Ysyn", posterior_pat_names)], probs=c(0.025,0.5,0.975))
-    postpred_pat = cbind(X_syn, postpred_pat)
-    colnames(postpred_pat) = c("mitochan", "lwr", "mid", "upr")
+    postpred_pat_norm = colQuantiles(posterior_pat[,grepl("Ysyn_norm", posterior_pat_names)], probs=c(0.025,0.5,0.975))
+    postpred_pat_def = colQuantiles(posterior_pat[,grepl("Ysyn_def", posterior_pat_names)], probs=c(0.025,0.5,0.975))
+    postpred_pat = cbind(X_syn, postpred_pat_norm, postpred_pat_def)
+    colnames(postpred_pat) = c("mitochan", "lwr_norm", "mid_norm", "upr_norm", "lwr_def", "mid_def", "upr_def")
     
     prior_pat_names = colnames(prior_pat)
-    priorpred_pat = colQuantiles(prior_pat[,grepl("Ysyn", prior_pat_names)], probs=c(0.025,0.5,0.975))
-    priorpred_pat = cbind(X_syn, priorpred_pat)
-    colnames(priorpred_pat) = c("mitochan", "lwr", "mid", "upr")
+    priorpred_pat_norm = colQuantiles(prior_pat[,grepl("Ysyn_norm", prior_pat_names)], probs=c(0.025,0.5,0.975))
+    priorpred_pat_def = colQuantiles(prior_pat[,grepl("Ysyn_def", prior_pat_names)], probs=c(0.025,0.5,0.975))
+    priorpred_pat = cbind(X_syn, priorpred_pat_norm, priorpred_pat_def)
+    colnames(priorpred_pat) = c("mitochan", "lwr_norm", "mid_norm", "upr_norm", "lwr_def", "mid_def", "upr_def")
     
     prior_patient = prior_pat[,c("m", "c", "tau_ctrl", "tau_notctrl", "probdiff")]
     
@@ -192,6 +193,8 @@ inputs = list()
     } # chans
 }
 
+tt = inference(inputs[[1]])
+
 ncores = detectCores() - 1
 cl  = makeCluster(ncores)
 {
@@ -199,7 +202,7 @@ cl  = makeCluster(ncores)
   clusterEvalQ(cl, {
     library("rjags")
     library("data.table")
-    source("./helper_functions.R", local=TRUE)
+    source("helper_functions.R", local=TRUE)
   })
   linreg_output = parLapply(cl, inputs, inference)
 }

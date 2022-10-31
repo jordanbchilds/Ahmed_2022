@@ -232,25 +232,23 @@ MCMCplot = function(folder, chan, pat="CONTROL", title="", lag=20){
 priorpost = function(ctrl_data, pat_data=NULL, priorpred, postpred,
                      classif=NULL, 
                      chan, mitochan="VDAC1", title="", xlims=NULL, ylims=NULL){
-
-    Xsyn = seq(0, max(c(ctrl_data[,1], pat_data[,1]))*1.5, length.out=1e4)
-    
-    op = par(mfrow=c(1,2))
+  
+    op = par(mfrow=c(1,2), mar=c(6,6,6,3), cex.main=2, cex.lab=2, cex.axis=1.5)
     plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1),
          xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
          main="Prior Predictive", xlim=xlims, ylim=ylims)
     if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=myYellow(0.2))
-    lines(Xsyn, priorpred[,1], lty=2, col=myGreen(0.6), lwd=3)
-    lines(Xsyn, priorpred[,2], lty=1, col=myGreen(0.6), lwd=4)
-    lines(Xsyn, priorpred[,3], lty=2, col=myGreen(0.6), lwd=3)
+    lines(priorpred[,"mitochan"], priorpred[,"lwr"], lty=2, col=myGreen(0.6), lwd=3)
+    lines(priorpred[,"mitochan"], priorpred[,"mid"], lty=1, col=myGreen(0.6), lwd=4)
+    lines(priorpred[,"mitochan"], priorpred[,"upr"], lty=2, col=myGreen(0.6), lwd=3)
     
     plot(ctrl_data, pch=20, col=myGrey(0.1),
          xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
          main="Posterior Predictive", xlim=xlims, ylim=ylims)
     if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
-    lines(Xsyn, postpred[,1], lty=2, col=myPink(0.6), lwd=3)
-    lines(Xsyn, postpred[,2], lty=1, col=myPink(0.6), lwd=4)
-    lines(Xsyn, postpred[,3], lty=2, col=myPink(0.6), lwd=3)
+    lines(priorpred[,"mitochan"], postpred[,"lwr"], lty=2, col=myPink(0.6), lwd=3)
+    lines(priorpred[,"mitochan"], postpred[,"mid"], lty=1, col=myPink(0.6), lwd=4)
+    lines(priorpred[,"mitochan"], postpred[,"upr"], lty=2, col=myPink(0.6), lwd=3)
     
     title(main=title, line=-2, outer=TRUE)
     
@@ -266,50 +264,26 @@ colvector_gen = function(pts){
   colind
 }
 
-pipost_plotter = function(fulldat, chan, folder, alpha=0.05, freq_compare=FALSE){
+pipost_plotter = function(chan, folder, alpha=0.05){
   
-  pts = getData_chanpats(fulldat)$patients
-  pts_blocks = unique(gsub("_S.", "", pts))
+  dat = read.csv(file.path("..", "rawdat_a.csv"), stringsAsFactors=FALSE)
+  sbj = unique(dat$caseno)
+  pts = sort(sbj[grepl("P0.", sbj)])
+  
   npat = length(pts)
   pis = list()
   
   freq_list = list()
   for(pat in pts){
-    pis[[pat]] = 1 - output_reader(folder, fulldat, chan, pat, out_type="POST")[,"probdiff"]
-    if(freq_compare){
-      if( pat %in% c("P2_QD_B2_L2_S1",
-                     "P2_QD_B2_L2_S2",
-                     "P2_QD_B2_L2_S3" ) ){
-        freq_est_R1 = read.csv(file.path("./BootsForJBC", paste0(pat, "_R1_single_defect.csv")), header=TRUE)
-        freq_est_R2 = read.csv(file.path("./BootsForJBC", paste0(pat, "_R2_single_defect.csv")), header=TRUE)
-        freq_list[[pat]] = c(freq_est_R1[[chan]], freq_est_R2[[chan]])/100.0
-      } else {
-        freq_est = read.csv(file.path("./BootsForJBC", paste0(pat, "_single_defect.csv")), header=TRUE)
-        freq_list[[pat]] = as.numeric(freq_est[[chan]])/100.0
-      }
-    }
+    pis[[pat]] = 1 - output_reader(folder, chan, pat, out_type="POST")[,"probdiff"]
   }
-
-  pat_labels = as.vector(rbind("", unique(gsub("_S.", "", gsub("P._", "", pts))), ""))
-  
-  title = paste0(substr(pts[1],1,2), " ", chan, "\n" )
+  title = paste0( chan )
   stripchart(pis, pch=20, method="jitter", vertical=TRUE, 
              col=rgb(t(col2rgb(palette()[colvector_gen(pts)]))/255, alpha=alpha), 
-             group.names=rep("", length(pts)),
+             group.names=pts,
              at = 1:npat,
-             main=title, ylim=c(-0.05,1.0), ylab="Proportion Deficiency", 
+             main=title, ylim=c(0.0,1.0), ylab="Proportion Deficiency", 
              xlab="Patient Sample")
-  if( freq_compare ){
-    stripchart(freq_list, method="jitter", vertical=TRUE,
-               cex=0.5, 
-               at=1:npat, col="black", pch=20, add=TRUE)
-  }
-  if(!all(substr(pts, 4,4)==substr(pts,4,4)[1])){
-    sep = sum(substr(pts, 4,4)==substr(pts,4,4)[1])+0.5
-    arrows(x0=sep, x1=sep, y0=0, y1=1, lwd=3, lty=2, length=0,
-           col=myDarkGrey(1))
-  }
-  text(1:npat, y=-0.07, labels=pat_labels, pos=3, cex=1.2)
 }
 
 
