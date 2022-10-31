@@ -30,7 +30,7 @@ parameters{
   cov_matrix[D] V2; //precision for component two
   real<lower=0> alpha;
   real<lower=0> beta;
-  real<lower=0, upper=1> probctrl[n_pts]; //'like-ctrl' patient proportions
+  real<lower=0, upper=1> probDef[n_pts]; //'like-ctrl' patient proportions
 }
 model{
   vector[K] tmp;
@@ -42,14 +42,14 @@ model{
   alpha ~ gamma(g_alpha, h_alpha); 
   beta ~ gamma(g_beta, h_beta);
   
-  probctrl ~ beta(alpha, beta);
+  probDef ~ beta(alpha, beta);
   
   for(i in 1:Nctrl){
     target += multi_normal_lpdf(Yctrl[i,] | mu1, V1);
   }
   for(j in 1:Npat){
-    tmp[1] = exp(log(probctrl[pat_index[j]]) + multi_normal_lpdf(Ypat[j,] | mu1, V1));
-    tmp[2] = exp(log(1-probctrl[pat_index[j]]) + multi_normal_lpdf(Ypat[j,] | mu2, V2));
+    tmp[1] = exp(log(1-probDef[pat_index[j]]) + multi_normal_lpdf(Ypat[j,] | mu1, V1));
+    tmp[2] = exp(log(probDef[pat_index[j]]) + multi_normal_lpdf(Ypat[j,] | mu2, V2));
     target += log(sum(tmp));    
   }
 }
@@ -62,8 +62,8 @@ generated quantities{
   matrix<lower=0>[Npat, K] dens;
   
   for(i in 1:Npat){
-    dens[i,1] = exp(log(probctrl[pat_index[i]]) + multi_normal_lpdf(Ypat[i,] | mu1, V1)); 
-    dens[i,2] = exp(log(1-probctrl[pat_index[i]]) + multi_normal_lpdf(Ypat[i,] | mu2, V2));
+    dens[i,1] = exp(log(1-probDef[pat_index[i]]) + multi_normal_lpdf(Ypat[i,] | mu1, V1)); 
+    dens[i,2] = exp(log(probDef[pat_index[i]]) + multi_normal_lpdf(Ypat[i,] | mu2, V2));
     probvec[i] = dens[i,1]/sum(dens[i,]);
   }
   

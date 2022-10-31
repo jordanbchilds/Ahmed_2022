@@ -3,105 +3,96 @@ source("./helper_functions.R", local = TRUE)
 
 folder = "allData_naiveBayes_GMM_hier"
 
-dir.create(file.path("./PDF"), showWarnings = FALSE)
-dir.create(file.path("./PDF", folder), showWarnings = FALSE)
+dir.create(file.path("PDF"), showWarnings = FALSE)
+dir.create(file.path("PDF", folder), showWarnings = FALSE)
 
-fulldats_raw = c(
-  "IMV.E02.P01.PMT.M3243AG.QIF.7TR.RAW.txt",
-  "IMV.E01.P02.PMT.M3243AG.QIF.TGo.RAW.txt",
-  "IMV.E02.P01.PMT.M3243AG.QIF.TGo.RAW.txt",
-  "IMV.E02.P01.PMT.M3243AG.QIF.TCF.RAW.txt"
-)
+cord = c("raw_CI", "raw_CIV")
+mitochan = "porin"
 
-prior = read.table(file.path("./Output", folder, "PRIOR.txt"), 
+dat = read.csv(file.path("..", "rawdat_a.csv"), stringsAsFactors=FALSE)
+sbj = unique(dat$caseno)
+crl = sbj[grepl("C0.", sbj)]
+pts = sort(sbj[grepl("P0.", sbj)])
+
+prior = read.table(file.path("Output", folder, "PRIOR.txt"), 
                    header=TRUE, stringsAsFactors=FALSE)
 
 pdf(file.path("./PDF", folder, "MCMC.pdf"), width=13, height=8)
 { 
-  for(fulldat in fulldats_raw){
-    chanpts = getData_chanpats(fulldat)
-    pts = gsub("_", ".", chanpts$patients)
-      for(chan in chanpts$channels){
-        MCMCplot(folder, fulldat, chan,  lag=100,
-                  title=paste(fulldat, "\n", chan))
-      }
+  for(chan in cord){
+    MCMCplot(folder, chan,  lag=100,
+             title=chan)
   }
 }
 dev.off()
 
 pdf(file.path("./PDF", folder, "model_post_RAW.pdf"), width=13, height=8)
 {
-  for(fulldat in fulldats_raw){
-    chanpts = getData_chanpats(fulldat)
-    for(chan in chanpts$channels){
-      ctrl_data =  getData_mats(fulldat, chan=chan, ctrl_only=TRUE, 
-                                data_transform=myData_transform)
+  for(chan in cord){
+    ctrl_data =  getData_mats(chan=chan, ctrl_only=TRUE, 
+                              data_transform=myData_transform)
 
-      pat_data = getData_mats(fulldat, chan=chan,
-                              data_transform=myData_transform)$pts
+    pat_data = getData_mats(chan=chan,
+                            data_transform=myData_transform)$pts
       
-      classif_allpats = output_reader(folder, fulldat, chan, out_type="CLASS")[[1]]
-      post = output_reader(folder, fulldat, chan, out_type="POST")
+    classif_allpats = output_reader(folder, chan, out_type="CLASS")[[1]]
+    post = output_reader(folder, chan, out_type="POST")
         
-      priorpost(ctrl_data=ctrl_data, pat_data=pat_data,
-                  classif=classif_allpats,
-                  prior=prior, post=post,
-                  chan=chan, mitochan="VDAC1", 
-                  title=paste(gsub(".RAW.txt", "", fulldat), "\n", chan))
+    priorpost(ctrl_data=ctrl_data, pat_data=pat_data,
+              classif=classif_allpats,
+              prior=prior, post=post,
+              chan=chan, mitochan="porin", 
+              title=chan)
     }
-  }
 }
 dev.off()
 
-pdf(file.path("./PDF", folder, "model_post.pdf"), width=13, height=8)
+pdf(file.path("PDF", folder, "model_post.pdf"), width=13, height=8)
 {
-  for(fulldat in fulldats_raw){
-    chanpts = getData_chanpats(fulldat)
-    for(chan in chanpts$channels){
-      ctrl_data =  getData_mats(fulldat, chan=chan, ctrl_only=TRUE)
-      pat_data = getData_mats(fulldat, chan=chan)$pts
+  for(chan in cord){
+    ctrl_data = getData_mats(chan=chan, ctrl_only=TRUE)
+    pat_data = getData_mats(chan=chan)$pts
+    
+    classif = output_reader(folder, chan, out_type="CLASS")[[1]]
+    post = output_reader(folder, chan, out_type="POST")
         
-      priorpost(ctrl_data=ctrl_data, pat_data=pat_data,
-                classif=output_reader(folder, fulldat, chan, out_type="CLASS")[[1]],
-                prior=prior, post=output_reader(folder, fulldat, chan, out_type="POST"),
-                chan=chan, mitochan="VDAC1", title=paste(gsub(".RAW.txt", "", fulldat), "\n", chan),
-                reverse_transform=back_transform, fulldat=fulldat, folder=folder)
-    }
+    priorpost(ctrl_data=ctrl_data, pat_data=pat_data,
+              classif=classif,
+              prior=prior, post=post,
+              chan=chan, mitochan="porin", title=chan,
+              reverse_transform=back_transform)
   }
 }
 dev.off()
 
 pdf(file.path("./PDF", folder, "pi_post.pdf"), width=13, height=8)
 {   
-  par(mfrow=c(1,1))
-  for(fulldat in fulldats_raw){
-    chans = getData_chanpats(fulldat)$channels
-      for(chan in chans){
-        pipost_plotter(folder, fulldat, chan, allData=TRUE) 
-      }
-    }
+  op = par(mfrow=c(1,1))
+  for(chan in cord){
+    pipost_plotter(folder, chan, allData=TRUE) 
+  }
+  par(op)
 }
 dev.off()
 
 pdf(file.path("./PDF", folder, "classifs.pdf"), width=13, height=8)
 {
-  for(fulldat in fulldats_raw){
-    chanpts = getData_chanpats(fulldat, get_Npats=TRUE)
-    for(chan in chanpts$channels){
-      ctrl_data =  getData_mats(fulldat, chan=chan, ctrl_only=TRUE)
+  op = par(cex.lab=2, cex.main=2, cex.axis=1.5, mar=c(6,6,6,3))
+   for(chan in cord){
+    ctrl_data =  getData_mats(chan=chan, ctrl_only=TRUE)
+    for(pat in pts){
+      pat_id = getData_mats(chan=chan, get_patindex=TRUE)$pat_id
+      pat_data = getData_mats(chan=chan, pts=pat)$pts
+      classifs = output_reader(folder, chan, out_type="CLASS")[[1]]
       
-      for(pat in chanpts$patients){
-        pat_data = getData_mats(fulldat, chan=chan, pts=pat)$pts
-        classifs = output_reader(folder, fulldat, chan, out_type="CLASS")[[1]]
-        par(cex.lab=2, cex.main=2, cex.axis=1.5, mar=c(6,6,6,3))
-        classif_plot(ctrl_data=ctrl_data, pat_data=pat_data,
-                     classifs_pat=classifs[index_creator(chanpts$Npats, pat)],
-                     chan=chan, mitochan="VDAC1", 
-                     title=paste(gsub(".RAW.txt", "", fulldat), "\n", chan, pat))
-        
-      }
+      classif_pat = classifs[pat_id==pat]
+      classif_plot(ctrl_data=ctrl_data, pat_data=pat_data,
+                   classifs_pat=classif_pat,
+                   chan=chan, mitochan="porin", 
+                   title=paste(chan, pat))
     }
-  }
+   }
+  par(op)
 }
 dev.off()
 

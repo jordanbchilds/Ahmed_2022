@@ -49,7 +49,7 @@ inference = function(input){
   
   n_1 = 100
   S_1 = matrix(c(3^2, 0, 0, 1^2), nrow=p, ncol=p, byrow=TRUE)*(n_1-p-1)
-  n_2 = 50
+  n_2 = 100
   S_2 = matrix(c(20^2,0,0,20^2), nrow=p, ncol=p, byrow=TRUE)*(n_2-p-1)
   
   g_alpha = 2
@@ -90,7 +90,7 @@ cl  = makeCluster(ncores)
 {
   clusterEvalQ(cl, {
     library("rstan")
-    source("./helper_functions.R")
+    source("helper_functions.R")
   })
   gmm_output = parLapply(cl, inputs, inference)
 }
