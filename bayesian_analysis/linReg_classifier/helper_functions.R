@@ -19,7 +19,7 @@ myYellow = function(alpha) rgb(225/255,200/255,50/255, alpha)
 myPink = function(alpha) rgb(255/255,62/255,150/255, alpha)
 myPurple = function(alpha) rgb(160/255, 32/255, 240/255, alpha)
 
-cramp = colorRamp(c(myRed(0.2),myBlue(0.2)), alpha=TRUE)
+cramp = colorRamp(c(myBlue(0.2),myRed(0.2)), alpha=TRUE)
 # rgb(...) specifies a colour using standard RGB, where 1 is the maxColorValue
 # 0.25 determines how transparent the colour is, 1 being opaque 
 # cramp is a function which generates colours on a scale between two specifies colours
@@ -186,7 +186,7 @@ output_reader = function(folder, chan, pat="CONTROL", out_type){
 ##
 
   
-classif_plot = function(ctrl_data, pat_data, classifs_pat, chan, mitochan="VDAC1", title){
+classif_plot = function(ctrl_data, pat_data, classifs_pat, chan, mitochan="raw_porin", title){
     op = par(mar=c(6,6,6,3), cex.axis=1.5, cex.lab=2, cex.main=2)
     xrange = range(c(ctrl_data[,1], pat_data[,1]))
     yrange = range(c(ctrl_data[,2], pat_data[,2]))
@@ -231,24 +231,49 @@ MCMCplot = function(folder, chan, pat="CONTROL", title="", lag=20){
 
 priorpost = function(ctrl_data, pat_data=NULL, priorpred, postpred,
                      classif=NULL, 
-                     chan, mitochan="VDAC1", title="", xlims=NULL, ylims=NULL){
+                     chan, mitochan="raw_porin", title="", xlims=NULL, ylims=NULL){
+  
+  op = par(mfrow=c(1,2), mar=c(6,6,6,3), cex.main=2, cex.lab=2, cex.axis=1.5)
+  plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1),
+       xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
+       main="Prior Predictive", xlim=xlims, ylim=ylims)
+  if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=myYellow(0.2))
+  lines(priorpred[,"mitochan"], priorpred[,"lwr_norm"], lty=2, col=myGreen(0.6), lwd=3)
+  lines(priorpred[,"mitochan"], priorpred[,"mid_norm"], lty=1, col=myGreen(0.6), lwd=4)
+  lines(priorpred[,"mitochan"], priorpred[,"upr_norm"], lty=2, col=myGreen(0.6), lwd=3)
+  
+  plot(ctrl_data, pch=20, col=myGrey(0.1),
+       xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
+       main="Posterior Predictive", xlim=xlims, ylim=ylims)
+  if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
+  lines(postpred[,"mitochan"], postpred[,"lwr_norm"], lty=2, col=myPink(0.6), lwd=3)
+  lines(postpred[,"mitochan"], postpred[,"mid_norm"], lty=1, col=myPink(0.6), lwd=4)
+  lines(postpred[,"mitochan"], postpred[,"upr_norm"], lty=2, col=myPink(0.6), lwd=3)
+  
+  title(main=title, line=-2, outer=TRUE)
+  
+  par(op)
+}
+
+predcomp = function(ctrl_data, pat_data=NULL, pred, classif=NULL, 
+                    chan, mitochan="raw_porin", title="", xlims=NULL, ylims=NULL){
   
     op = par(mfrow=c(1,2), mar=c(6,6,6,3), cex.main=2, cex.lab=2, cex.axis=1.5)
     plot(ctrl_data, pch=20, cex=0.7, col=myGrey(0.1),
          xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
          main="Prior Predictive", xlim=xlims, ylim=ylims)
-    if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=myYellow(0.2))
-    lines(priorpred[,"mitochan"], priorpred[,"lwr"], lty=2, col=myGreen(0.6), lwd=3)
-    lines(priorpred[,"mitochan"], priorpred[,"mid"], lty=1, col=myGreen(0.6), lwd=4)
-    lines(priorpred[,"mitochan"], priorpred[,"upr"], lty=2, col=myGreen(0.6), lwd=3)
+    if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
+    lines(pred[,"mitochan"], pred[,"lwr_def"], lty=2, col=myRed(0.6), lwd=3)
+    lines(pred[,"mitochan"], pred[,"mid_def"], lty=1, col=myRed(0.6), lwd=4)
+    lines(pred[,"mitochan"], pred[,"upr_def"], lty=2, col=myRed(0.6), lwd=3)
     
     plot(ctrl_data, pch=20, col=myGrey(0.1),
          xlab=paste0("log(",mitochan,")"), ylab=paste0("log(",chan,")"), 
          main="Posterior Predictive", xlim=xlims, ylim=ylims)
     if(!is.null(pat_data)) points(pat_data, pch=20, cex=1.2, col=classcols(classif))
-    lines(priorpred[,"mitochan"], postpred[,"lwr"], lty=2, col=myPink(0.6), lwd=3)
-    lines(priorpred[,"mitochan"], postpred[,"mid"], lty=1, col=myPink(0.6), lwd=4)
-    lines(priorpred[,"mitochan"], postpred[,"upr"], lty=2, col=myPink(0.6), lwd=3)
+    lines(pred[,"mitochan"], pred[,"lwr_norm"], lty=2, col=myBlue(0.6), lwd=3)
+    lines(pred[,"mitochan"], pred[,"mid_norm"], lty=1, col=myBlue(0.6), lwd=4)
+    lines(pred[,"mitochan"], pred[,"upr_norm"], lty=2, col=myBlue(0.6), lwd=3)
     
     title(main=title, line=-2, outer=TRUE)
     
@@ -275,7 +300,7 @@ pipost_plotter = function(chan, folder, alpha=0.05){
   
   freq_list = list()
   for(pat in pts){
-    pis[[pat]] = 1 - output_reader(folder, chan, pat, out_type="POST")[,"probdiff"]
+    pis[[pat]] = output_reader(folder, chan, pat, out_type="POST")[,"probdiff"]
   }
   title = paste0( chan )
   stripchart(pis, pch=20, method="jitter", vertical=TRUE, 

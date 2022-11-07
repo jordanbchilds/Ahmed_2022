@@ -11,11 +11,7 @@ getData_mats = function(chan, mitochan="raw_porin",
                         get_patindex=FALSE, one_matrix=FALSE){
 
   data = read.csv("../rawdat_a.csv", stringsAsFactors=FALSE)
-
-  sbj = sort(unique(data$caseno))
-  crl = grep("C", sbj, value = TRUE)
-  pts = grep("P", sbj, value=TRUE)
-
+  
   Xctrl = data[grepl("C", data$caseno), mitochan]
   Yctrl = data[grepl("C", data$caseno), chan]
   ctrl_mat = cbind( Xctrl, Yctrl )
@@ -25,6 +21,10 @@ getData_mats = function(chan, mitochan="raw_porin",
     pat_id = vector("character")
     ind = 1L
     if(is.null(pts)){
+      
+      sbj = sort(unique(data$caseno))
+      pts = grep("P", sbj, value=TRUE)
+      
       Ypts = list()
       for(pat in pts){
         Xpat = data[data$caseno==pat, mitochan]
@@ -181,29 +181,18 @@ myData_transform = function(ctrl_mat, pat_mat=NULL){
   ctrl_mat
 }
 
-back_transform = function(X, ctrl_mat=NULL, fulldat=NULL, folder=NULL, chan=NULL, pat=NULL, 
-                          parameters=NULL){
-  if( !is.null(fulldat) | !is.null(folder) | !is.null(chan) | !is.null(pat)){ 
-    ctrl_mat = getData_mats(fulldat, chan=chan, pts=pat, ctrl_only=TRUE, data_transform=log_transform)
-  }
-  if(!is.null(ctrl_mat)){
-    pca = prcomp(ctrl_mat, scale=FALSE, center=FALSE)
-    ctrl_mat = pca$x
-    ctrl_mean = colMeans(ctrl_mat)
-    ctrl_sd = sqrt(diag(var(ctrl_mat)))
-    
-    if(!is.null(parameters)){ list(seq(1,ncol(X))) }
-    Xnew = X
-    for(i in 1:length(parameters)){
-      params = parameters[[i]]
-      Xnew[, params] = scale_mat(X[,params], scale=ctrl_sd, reverse=TRUE)
-      Xnew[, params] = centre_mat(Xnew[, params], centre=ctrl_mean, reverse=TRUE)  
-      Xnew[, params] = rotate_mat(as.matrix(Xnew[,params]), R=pca$rotation, reverse=TRUE)
-    }
-  } else {
-    stop("Must supply ctrl_raw or fulldat, folder, chan and pat")
-  }
-  Xnew
+back_transform = function(X, ctrl_mat){
+  pca = prcomp(ctrl_mat, scale=FALSE, center=FALSE)
+  ctrl_mat = pca$x
+  ctrl_mean = colMeans(ctrl_mat)
+  ctrl_sd = sqrt(diag(var(ctrl_mat)))
+  
+  Xnew = scale_mat(X, scale=ctrl_sd, reverse=TRUE)
+  Xnew = centre_mat(Xnew, centre=ctrl_mean, reverse=TRUE)  
+  Xnew[, grepl("comp\\.1", colnames(Xnew))] = rotate_mat(as.matrix(Xnew[,grepl("comp\\.1", colnames(Xnew))]), R=pca$rotation, reverse=TRUE)     
+  Xnew[, grepl("comp\\.2", colnames(Xnew))] = rotate_mat(as.matrix(Xnew[,grepl("comp\\.2", colnames(Xnew))]), R=pca$rotation, reverse=TRUE)     
+  
+  return(Xnew)
 }
 
 log_transform = function(ctrl_mat, pat_mat=NULL){
@@ -217,27 +206,22 @@ log_transform = function(ctrl_mat, pat_mat=NULL){
 
 output_saver = function(outroot, output, folder){
   split = strsplit(outroot, split="_")[[1]]
-  froot = split[1]
   chan = split[2]
   pat = split[3]
   
   for(ctrl_pat in c("ctrl", "pat")){
     out_ctrlpat = ifelse(ctrl_pat=="ctrl", "CONTROL", pat)
     for(out_type in names(output[[ctrl_pat]])){
-      filename = paste(froot, chan, out_ctrlpat, toupper(out_type), sep="_")
+      filename = paste(chan, out_ctrlpat, toupper(out_type), sep="_")
       write.table(output[[ctrl_pat]][[out_type]], paste0(file.path("Output", folder, filename), ".txt"),
                   row.names=FALSE, col.names=TRUE)
     }
   }
 }
 
-output_reader = function(folder, fulldat, chan, pat=NULL, out_type){
-  if(is.null(pat)){
-    outroot = paste(gsub(".RAW.txt", "", fulldat), chan, sep="_")
-  } else {
-    outroot = paste(gsub(".RAW.txt", "", fulldat), chan, gsub("_",".", pat), sep="_")
-  }
-  fp = file.path("./Output", folder, paste0(outroot, "_", out_type, ".txt"))
+output_reader = function(folder, chan, out_type){
+
+  fp = file.path("./Output", folder, paste0(chan, "_", out_type, ".txt"))
   if(file.exists(fp)) return( read.table(fp, header=TRUE, stringsAsFactors=FALSE) )
   else stop("file does not exist")
 }
@@ -255,40 +239,33 @@ colvector_gen = function(pts){
   colind
 }
 
-pipost_plotter = function(folder, fulldat, chan, alpha=0.05, allData=TRUE){
-  pts = getData_chanpats(fulldat)$patients
-  pts_blocks = unique(gsub("_S.", "", pts))
+pipost_plotter = function(folder, chan, alpha=0.02, allData=TRUE){
+  
+  dat = read.csv(file.path("..", "rawdat_a.csv"), stringsAsFactors=FALSE)
+  sbj = unique(dat$caseno)
+  pts = sort(sbj[grepl("P0.", sbj)])
   npat = length(pts)
   
   pis = list()
   if(allData){
-    post = output_reader(folder, fulldat, chan, out_type="POST")
+    post = output_reader(folder, chan, out_type="POST")
     for(i in 1:npat){
-      pis[[pts[i]]] = post[,paste0("probctrl.",i,".")]
+      pis[[pts[i]]] = post[,paste0("probDef.",i,".")]
     }
   } else {
     for(pat in pts){
-      pis[[pat]] = output_reader(folder, fulldat, chan, out_type="POST")[,"probctrl"]
+      pis[[pat]] = output_reader(folder, chan, out_type="POST")[,"probDef"]
     }
   }
 
-  pat_labels = as.vector(rbind("", unique(gsub("_S.", "", gsub("P._", "", pts))), ""))
-  
   op = par(mar=c(6,6,6,3), cex.main=2, cex.lab=2, cex.axis=1.5)
   
   stripchart(pis, pch=20, method="jitter", vertical=TRUE, 
              col=rgb(t(col2rgb(palette()[colvector_gen(pts)]))/255, alpha=alpha), 
-             group.names=rep("", length(pts)),
-             main="", ylim=c(0,1), ylab="like control proportion", 
+             group.names=pts,
+             main="", ylim=c(0,1), ylab="Deficiency Proportion", 
              xlab="Patient Sample")
-  if(!all(substr(pts, 4,4)==substr(pts,4,4)[1])){
-    sep = sum(substr(pts, 4,4)==substr(pts,4,4)[1])+0.5
-    arrows(x0=sep, x1=sep, y0=0, y1=1, lwd=3, lty=2, length=0, 
-           col=myDarkGrey(1))
-  }
-  text(1:length(pts), y=0, labels=pat_labels, pos=3, cex=1)
-  title(main=paste0(substr(pts[1],1,2), " ", chan, "\n", gsub(".RAW.txt", "", fulldat) ), 
-        line=-4, outer=TRUE)
+  title(main=chan, line=-2, outer=TRUE)
   par(op)
 }
 
@@ -305,18 +282,20 @@ percentiles = function(xdat, ydat, probs=c(0.975, 0.5, 0.025)){
 }
 
 priorpost = function(ctrl_data, pat_data, prior=NULL, post, classifs_pat, title="",
-                     mitochan="VDAC1", chan, pat=NULL, reverse_transform=NULL, ...){
+                     mitochan="porin", chan, pat=NULL, reverse_transform=NULL ){
+  
+  ctrl_raw = getData_mats(chan, ctrl_only=TRUE)
+  
   xlims = range(c(ctrl_data[,1], pat_data[,1]))
   ylims = range(c(ctrl_data[,2], pat_data[,2]))
   
   if(!is.null(reverse_transform)){
-    prior = back_transform(prior, fulldat=fulldat, folder=folder, chan=chan, pat=pat, 
-                           parameters=list(c("comp.1.1.", "comp.2.1."), c("comp.1.2.", "comp.2.2.")))
-    post = back_transform(post, fulldat=fulldat, folder=folder, chan=chan, pat=pat, 
-                          parameters=list(c("comp.1.1.", "comp.2.1."), c("comp.1.2.", "comp.2.2.")))
+    prior = reverse_transform(prior[,grepl("comp", colnames(prior))], ctrl_raw)
+    post = reverse_transform(post[grepl("comp", colnames(post))], ctrl_raw)
   }
   
   op = par(mfrow=c(1,2), mar=c(6,6,6,3), cex.main=2, cex.lab=2, cex.axis=1.5)
+  
   if(!is.null(prior)){
     op = par(mfrow=c(2,2))
     plot(ctrl_data, pch=20, col=myDarkGrey(0.3), 
@@ -352,9 +331,10 @@ priorpost = function(ctrl_data, pat_data, prior=NULL, post, classifs_pat, title=
   par(op)
 }
 
-MCMCplot = function(folder, fulldat, chan, pat=NULL, title="", lag=20){
-  post = output_reader(folder, fulldat, chan, pat, out_type="POST")
-  prior = read.table(file.path("./Output", folder, "PRIOR.txt"), 
+MCMCplot = function(folder, chan, pat=NULL, title="", lag=20){
+  
+  post = output_reader(folder, chan, out_type="POST")
+  prior = read.table(file.path("Output", folder, "PRIOR.txt"), 
                      header=TRUE, stringsAsFactors=FALSE)
 
   col.names = colnames(post)
@@ -382,7 +362,7 @@ MCMCplot = function(folder, fulldat, chan, pat=NULL, title="", lag=20){
 }
 
 classif_plot = function(ctrl_data=NULL, pat_data, classifs_pat, 
-                        title="", mitochan="VDAC1", chan, pat){
+                        title="", mitochan="raw_porin", chan, pat){
   xlims = range(c(ctrl_data[,1], pat_data[,1]))
   ylims = range(c(ctrl_data[,2], pat_data[,2]))
   
@@ -418,11 +398,6 @@ index_creator = function(Npops, ind){
   }
 }
 
-classif_finder = function(classifs_all, fulldat, pat){
-  Npats = getData_chanpats(fulldat, get_Npats=TRUE)$Npats
-  
-  classifs_all[index_creator(Npats, pat)]
-}
 
 
 

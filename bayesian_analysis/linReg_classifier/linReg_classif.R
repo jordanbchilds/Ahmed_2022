@@ -3,7 +3,7 @@ library(MASS)
 library(parallel)
 source("helper_functions.R", local=TRUE)
 
-folder = "linReg_classifier"
+folder = "linReg_classifier_flexOne"
 
 dir.create(file.path("./Output"), showWarnings = FALSE)
 dir.create(file.path("./Output", folder), showWarnings = FALSE)
@@ -32,7 +32,7 @@ modelstring = "
 "
 
 cord = c("raw_CI", "raw_CIV")
-mitochan = "porin"
+mitochan = "raw_porin"
 
 dat = read.csv("../rawdat_a.csv", stringsAsFactors=FALSE)
 sbj = unique(dat$caseno)
@@ -90,7 +90,7 @@ inference = function(input){
     
     ### patient inference
     # pateint priors
-    flex = 0.1
+    flex = 1
     c_est = mean(posterior_ctrl$c)
     tau_c = flex/(sd(posterior_ctrl$c)^2)
     m_est = mean(posterior_ctrl$m)
@@ -178,7 +178,7 @@ inference = function(input){
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 2000
+  input0$MCMCOut = 1000
   input0$MCMCBurnin = 1000
   input0$MCMCThin = 50
   input0$n.chains = 1

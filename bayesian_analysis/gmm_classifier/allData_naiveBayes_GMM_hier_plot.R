@@ -1,5 +1,5 @@
 library("MASS")
-source("./helper_functions.R", local = TRUE)
+source("helper_functions.R", local = TRUE)
 
 folder = "allData_naiveBayes_GMM_hier"
 
@@ -26,7 +26,7 @@ pdf(file.path("./PDF", folder, "MCMC.pdf"), width=13, height=8)
 }
 dev.off()
 
-pdf(file.path("./PDF", folder, "model_post_RAW.pdf"), width=13, height=8)
+pdf(file.path("./PDF", folder, "model_post_RAW.pdf"), width=13, height=13)
 {
   for(chan in cord){
     ctrl_data =  getData_mats(chan=chan, ctrl_only=TRUE, 
@@ -47,7 +47,7 @@ pdf(file.path("./PDF", folder, "model_post_RAW.pdf"), width=13, height=8)
 }
 dev.off()
 
-pdf(file.path("PDF", folder, "model_post.pdf"), width=13, height=8)
+pdf(file.path("PDF", folder, "model_post.pdf"), width=13, height=11)
 {
   for(chan in cord){
     ctrl_data = getData_mats(chan=chan, ctrl_only=TRUE)

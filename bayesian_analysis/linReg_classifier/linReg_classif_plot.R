@@ -1,7 +1,7 @@
 library(MASS)
 source("helper_functions.R", local = TRUE)
 
-folder = "linReg_classifier"
+folder = "linReg_classifier_CNR"
 
 dir.create("PDF", showWarnings=FALSE)
 dir.create(file.path("PDF",folder), showWarnings=FALSE)
@@ -42,12 +42,6 @@ pdf(file.path("PDF", folder, "model_post.pdf"), width=13, height=8)
     xlims = range(c(ctrl_data[,1], pts_data[,1]))
     ylims = range(c(ctrl_data[,2], pts_data[,2]))
       
-    # priorpost(ctrl_data=ctrl_data, 
-    #           priorpred=output_reader0(out_type="PRIORPRED"),
-    #           postpred=output_reader0(out_type="POSTPRED"),
-    #           chan=chan,title=paste(chan, "CONTROL"),
-    #           xlims=xlims, ylims=ylims)
-    #   
     for(pat in pts){
       pat_data = getData_mats(chan=chan, pts=pat)$pts
         
@@ -59,6 +53,27 @@ pdf(file.path("PDF", folder, "model_post.pdf"), width=13, height=8)
                 xlims=xlims, ylims=ylims)
       }
     }
+}
+dev.off()
+
+pdf(file.path("PDF", folder, "compare_preds.pdf"), width=13, height=8)
+{
+  for(chan in cord){
+    ctrl_data =  getData_mats(chan=chan)$ctrl
+    pts_data = getData_mats(chan=chan)$pts
+    xlims = range(c(ctrl_data[,1], pts_data[,1]))
+    ylims = range(c(ctrl_data[,2], pts_data[,2]))
+    
+    for(pat in pts){
+      pat_data = getData_mats(chan=chan, pts=pat)$pts
+      
+      predcomp(ctrl_data=ctrl_data, pat_data=pat_data,
+                classif=output_reader(folder, chan, pat=pat, out_type="CLASSIF")[[1]],
+                pred=output_reader(folder, chan, pat=pat, "POSTPRED"),
+                chan=chan, mitochan="VDAC1", title=paste(chan, pat),
+                xlims=xlims, ylims=ylims)
+    }
+  }
 }
 dev.off()
 
