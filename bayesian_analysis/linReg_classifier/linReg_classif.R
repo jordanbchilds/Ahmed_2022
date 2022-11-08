@@ -3,7 +3,7 @@ library(MASS)
 library(parallel)
 source("helper_functions.R", local=TRUE)
 
-folder = "linReg_classifier_flexOne"
+folder = "linReg_classifier_flexTen"
 
 dir.create(file.path("./Output"), showWarnings = FALSE)
 dir.create(file.path("./Output", folder), showWarnings = FALSE)
@@ -90,7 +90,7 @@ inference = function(input){
     
     ### patient inference
     # pateint priors
-    flex = 1
+    flex = 10
     c_est = mean(posterior_ctrl$c)
     tau_c = flex/(sd(posterior_ctrl$c)^2)
     m_est = mean(posterior_ctrl$m)
@@ -192,8 +192,6 @@ inputs = list()
       } # pts
     } # chans
 }
-
-tt = inference(inputs[[1]])
 
 ncores = detectCores() - 1
 cl  = makeCluster(ncores)
