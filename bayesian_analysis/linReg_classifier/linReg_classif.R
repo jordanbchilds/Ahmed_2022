@@ -3,7 +3,7 @@ library(MASS)
 library(parallel)
 source("helper_functions.R", local=TRUE)
 
-folder = "linReg_classifier_flexTen"
+folder = "linReg_classifier"
 
 dir.create(file.path("./Output"), showWarnings = FALSE)
 dir.create(file.path("./Output", folder), showWarnings = FALSE)
@@ -53,11 +53,15 @@ inference = function(input){
     tau_c = 1/2^2
     m_est = 0
     tau_m = 1/2^2
-    shape_tau = 10
+    shape_tau = 3
     rate_tau = 1
-    shape_gamma = 20 # irrelevant - will only sample from prior
-    rate_gamma = 10 # irrelevant - will only sample from prior
     
+    gamma_mean = 20
+    gamma_var = 10^2
+    
+    shape_gamma = gamma_mean^2 / gamma_var
+    rate_gamma = gamma_mean / gamma_var
+
     N_syn = 1e4
     X_syn = seq(0, max(c(ctrl_mat[,1], pat_mat[,1]))*1.5, length.out=N_syn)
     
@@ -90,29 +94,27 @@ inference = function(input){
     
     ### patient inference
     # pateint priors
-    flex = 10
+    flex = 0.01
     c_est = mean(posterior_ctrl$c)
-    tau_c = flex/(sd(posterior_ctrl$c)^2)
+    tau_c = flex / var(posterior_ctrl$c)
     m_est = mean(posterior_ctrl$m)
-    tau_m = flex/(sd(posterior_ctrl$m)^2)
-    #delta = 1.5*as.numeric(quantile(posterior_ctrl$tau_ctrl,0.5)) # Choose this value so that Tiago's replication dataset never predicts over-expression of CI or CIV
-    delta = 0.0
-    tau_mean = mean(posterior_ctrl$tau_ctrl) + delta # Precision tau = (1/sd)^2
-    tau_sd = sd(posterior_ctrl$tau_ctrl) # Deviation from prior tau should require a lot of contradictory data
-    tau_shape = (tau_mean^2)/(tau_sd^2)
-    tau_rate = tau_mean/(tau_sd^2)
+    tau_m = flex / var(posterior_ctrl$m)
+    tau_mean = mean(posterior_ctrl$tau_ctrl) # Precision tau = (1/sd)^2
+    tau_var = var(posterior_ctrl$tau_ctrl) # Deviation from prior tau should require a lot of contradictory data
+    tau_shape =  tau_mean^2 / tau_var
+    tau_rate = tau_mean / tau_var
     
-    gamma_mode = 20 # ctrl sampled from prior so can ignore the ctrl posterior
-    gamma_sd = 10 # ctrl sampled from prior so can ignore the ctrl posterior
-    rate_gamma = (gamma_mode+sqrt(gamma_mode^2+4*gamma_mode^2))/(2*gamma_sd^2)
-    shape_gamma = 1+gamma_mode*rate_gamma
+    gamma_mean = 20 
+    gamma_var = 10^2
+    gamma_shape = gamma_mean^2 / gamma_var
+    gamma_rate = gamma_mean / gamma_var
     
     data_pat = list(Xobs=pat_mat[,1], Yobs=pat_mat[,2], N=Npat, Nsyn=N_syn,
                     Xsyn=X_syn, 
                     mu_m=m_est, tau_m=tau_m, 
                     mu_c=c_est, tau_c=tau_c,
                     shape_tau=tau_shape, rate_tau=tau_rate, 
-                    shape_gamma=shape_gamma, rate_gamma=rate_gamma, 
+                    shape_gamma=gamma_shape, rate_gamma=gamma_rate, 
                     alpha=1, beta=1,
                     ctrl_ind=0)
     
@@ -123,7 +125,7 @@ inference = function(input){
     model_pat = jags.model(textConnection(modelstring), data=data_pat, n.chains=n.chains)
     model_pat_priorpred = jags.model(textConnection(modelstring), data=data_pat_priorpred)
     update(model_pat, n.iter=MCMCBurnin)
-    #converge_pat=coda.samples(model=model_pat,variable.names=c("m","c","tau_par","class","probdiff"),n.iter=MCMCUpdates_Report,thin=MCMCUpdates_Thin)
+
     output_pat_post = coda.samples(model=model_pat, n.iter=MCMCOut*MCMCThin, thin=MCMCThin,
                             variable.names=c("m","c","tau_ctrl","tau_notctrl","Ysyn_norm", "Ysyn_def","class","probdiff"))
     output_pat_prior = coda.samples(model=model_pat_priorpred,n.iter=MCMCOut, thin=1,
@@ -178,9 +180,9 @@ inference = function(input){
 inputs = list()
 {
   input0 = list()
-  input0$MCMCOut = 1000
-  input0$MCMCBurnin = 1000
-  input0$MCMCThin = 50
+  input0$MCMCOut = 2000
+  input0$MCMCBurnin = 2000
+  input0$MCMCThin = 100
   input0$n.chains = 1
 
     for(chan in cord){

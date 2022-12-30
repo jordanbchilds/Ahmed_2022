@@ -1,7 +1,7 @@
 library(MASS)
 source("helper_functions.R", local = TRUE)
 
-folder = "linReg_classifier_CNR"
+folder = "linReg_classifier_flexTen"
 
 dir.create("PDF", showWarnings=FALSE)
 dir.create(file.path("PDF",folder), showWarnings=FALSE)
