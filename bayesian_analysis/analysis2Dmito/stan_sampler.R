@@ -1,44 +1,38 @@
-#library("devtools")
-#devtools::install_github("jordanbchilds/analysis2Dmito", force=TRUE)
-library("analysis2Dmito")
+# install.packages("devtools")
+# library("devtools")
+# install_github("jordanbchilds/analysis2Dmito", force=TRUE)
 
+library(analysis2Dmito)
 library("parallel")
+library("dplyr")
+library("readr")
+library("tidyr")
 library("data.table")
 library("rstan")
 source("stan_sampler_function.R", local=TRUE)
 
-folder = "stan_sampler_multiChain"
+folder = "stan_sampler_prior12"
 
-dir.create("Output", showWarnings = FALSE)
+dir.create(file.path("Output"), showWarnings = FALSE)
 dir.create(file.path("Output", folder), showWarnings = FALSE)
 
-data_cnr = as.data.frame(fread("DataChildsFormat_adj.txt"))
+mitochan = "VDAC"
+channels = c("NDUFB8", "CYB", "MTCO1")
 
-mitochan = "Porin"
-channels = c("CI", "CIV")
-nChan = length(channels)
+raw_data = read.csv("../Data_prepped.csv", header=TRUE)
 
-dat_raw = data_cnr[ data_cnr$channel %in% c(mitochan, channels), ]
+raw_data = raw_data[,c("ID", "patient_id", mitochan, channels)]
+colnames(raw_data) = c("fibreID", "sampleID", mitochan, channels)
 
-quant = 0.025
-deltas = c(quantile(dat_raw[dat_raw$channel=="Porin", "value"],quant,na.rm=TRUE),
-           quantile(dat_raw[dat_raw$channel=="CI", "value"],quant,na.rm=TRUE),
-           quantile(dat_raw[dat_raw$channel=="CIV", "value"],quant,na.rm=TRUE))
-names(deltas) = c("raw_porin","raw_CI","raw_CIV")
+data_lng = pivot_longer(raw_data, cols=c(mitochan, channels), names_to="channel")
+data_lng = as.data.frame(data_lng)
 
-dat_adj = dat_raw
+data = data_lng
+data$value = log(data$value)
 
-lower = -9999999
-dat_adj[dat_adj$channel=="Porin", "value"] = pmax(lower,dat_raw[dat_raw$channel=="Porin","value"]-deltas["raw_porin"])
-dat_adj[dat_adj$channel=="CI", "value"] = pmax(lower,dat_raw[dat_raw$channel=="CI", "value"]-deltas["raw_CI"])
-dat_adj[dat_adj$channel=="CIV", "value"] = pmax(lower,dat_raw[dat_raw$channel=="CIV", "value"]-deltas["raw_CIV"])
-
-#dat_adj[dat$channel=="CI", "value"] = dat$raw_CI-deltas["raw_CI"]
-#dat_adj[dat$channel=="CIV", "value"] = dat$raw_CIV-deltas["raw_CIV"]
-
-sbjs = unique(dat_adj$sampleID)
-ctrlID = grep("C0", sbjs, value = TRUE)
-pts = sort( grep("C0", sbjs, value=TRUE, invert=TRUE) )
+sbj = unique(data$sampleID)
+ctrlID = grep("C", sbj, value=TRUE)
+pts = sbj[!(sbj %in% ctrlID)]
 
 grad = matrix(NA, nrow=length(channels), ncol=length(ctrlID))
 colnames(grad) = ctrlID
@@ -47,24 +41,23 @@ rownames(grad) = channels
 inter = grad
 prec = grad
 
-op = par(mfrow=c(1,1))
 for( chan in channels ){
   for( crl in ctrlID ){
-    xCtrl = dat_adj[dat_adj$channel==mitochan & dat_adj$sampleID==crl, "value"]
-    yCtrl = dat_adj[dat_adj$channel==chan & dat_adj$sampleID==crl, "value"]
+    xCtrl = data[data$channel==mitochan & data$sampleID==crl, "value"]
+    yCtrl = data[data$channel==chan & data$sampleID==crl, "value"]
     dd = data.frame(mitochan=xCtrl, chan=yCtrl)
-    xSyn = data.frame(mitochan=seq(min(dat_adj$value)-1, max(dat_adj$value)+1, length.out=1e3))
+    xSyn = data.frame(mitochan=seq(min(data$value)-1, max(data$value)+1, length.out=1e3))
     
     mod = lm(chan ~ mitochan, data=dd)
     pred = predict.lm(mod, newdata=xSyn, interval="prediction")
     for( pat in pts ){
-      xPat = dat_adj[dat_adj$channel==mitochan & dat_adj$sampleID==pat, "value"]
-      yPat = dat_adj[dat_adj$channel==chan & dat_adj$sampleID==pat, "value"]
+      xPat = data[data$channel==mitochan & data$sampleID==pat, "value"]
+      yPat = data[data$channel==chan & data$sampleID==pat, "value"]
       
-      plot(xCtrl,yCtrl, pch=20, col=alphaBlack(0.1),
+      plot(xCtrl,yCtrl, pch=20, col=alphaBlack(1.0),
            xlab=mitochan, ylab=chan,
-           xlim=range(dat_adj$value), ylim=range(dat_adj$value))
-      points(xPat, yPat, pch=20, col=alphaBlue(0.2))
+           xlim=range(data$value), ylim=range(data$value))
+      points(xPat, yPat, pch=20, col=alphaBlue(0.7))
       lines(xSyn$mitochan, pred[,"fit"], lty="solid", col="pink", lwd=3)
       lines(xSyn$mitochan, pred[,"lwr"], lty="dashed", col="pink", lwd=3)
       lines(xSyn$mitochan, pred[,"upr"], lty="dashed", col="pink", lwd=3)
@@ -75,7 +68,6 @@ for( chan in channels ){
     }
   }
 }
-par(op)
 
 grad_mean = apply(grad, 1, mean)
 inter_mean = apply(inter, 1, mean)
@@ -85,19 +77,19 @@ grad_var = apply(grad, 1, var)
 inter_var = apply(inter, 1, var)
 prec_var = apply(prec, 1, var)
 
-tau_c_vars = rep(50, nChan)^2 # c(2.5, 2, 2.5)
-names(tau_c_vars) = channels
+tau_c_vars = c(50, 50, 50)^2 # c(2.5, 2, 2.5)
+names(tau_c_vars) = c("NDUFB8", "MTCO1", "CYB")
 
-tau_m_vars = rep(50, nChan)^2 # c(10, 0.5, 1)
-names(tau_m_vars) = channels
+tau_m_vars = c(50, 50, 50)^2 # c(10, 0.5, 1)
+names(tau_m_vars) = c("NDUFB8", "MTCO1", "CYB")
 
-tau_vars = rep(50, nChan)^2 # c(3, 1.5, 3)
-names(tau_vars) = channels
+tau_vars = c(10, 10, 10)^2 # c(3, 1.5, 3)
+names(tau_vars) = c("NDUFB8", "MTCO1", "CYB")
 
-grad_var =  1 / rep(50, nChan)
-inter_var = 1 / rep(50, nChan)
-names(grad_var) = channels
-names(inter_var) = channels
+grad_var =  1 / c(50, 50, 50)
+inter_var = 1 / c(50, 50, 50)
+names(grad_var) = c("NDUFB8", "MTCO1", "CYB")
+names(inter_var) = c("NDUFB8", "MTCO1", "CYB")
 
 for (chan in channels) {
   mean_mu_m = grad_mean[chan]
@@ -142,7 +134,7 @@ for (chan in channels) {
   data_list = list()
   for (i in seq_along(pts)) {
     data_list[[paste(chan, pts[i], sep = "__")]] = getData_mats(
-      dat_adj,
+      data,
       pts = pts[i],
       channels = c(mitochan, chan),
       ctrlID = ctrlID,
@@ -150,29 +142,28 @@ for (chan in channels) {
     )
   }
   
-  ncores = detectCores() - 1
+  ncores = 9
   cl  = makeCluster(ncores)
   {
     clusterExport(cl, c("stan"))
-    output = parLapply(
+    gibbs_output = parLapply(
       cl,
       data_list,
       stan_inference,
       MCMCburnin = 1000,
       MCMCout = 1000,
-      MCMCthin = 1,
-      nChains = 10,
-      max_logLik = FALSE,
+      MCMCthin=1,
+      nChains=10,
+      max_logLik=FALSE,
       parameterVals = paramVals
     )
   }
   stopCluster(cl)
-  
-  for( rt in names(output) ){
-    list_saver(output[[rt]], file.path("Output", folder, rt))
+
+  for( rt in names(gibbs_output) ){
+    list_saver(gibbs_output[[rt]], file.path("Output", folder, rt))
   }
 }
-
 
 
 
