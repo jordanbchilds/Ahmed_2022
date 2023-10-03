@@ -1,3 +1,6 @@
+#library(devtools)
+#install_github('gastonstat/colortools')
+
 library(colortools)
 library(data.table)
 library(fitdistrplus)
@@ -173,7 +176,7 @@ samplerows = function(df,N){
   return(df[sample(nrow(df),N,replace=TRUE),])
 }
 
-diffdfs = function(df1,df2){
+diffdfs = function(df1,df2){ 
   return(as.numeric(sqrt(rowSums((df1-df2)^2))))
 }
 
@@ -609,3 +612,38 @@ defs = aggregate(as.character(dts$biochem)=="Deficient",by=list(dts$caseno),sum)
 fibs = aggregate(as.character(dts$biochem)=="Deficient",by=list(dts$caseno),length)
 deffracs = data.frame(caseno=defs[,1],deficient=100*defs$x/fibs$x)
 write.table(deffracs,"PropDef.txt",sep="\t",quote=FALSE,row.names=FALSE)
+
+dat$fibre_type[dat$fibre_type=="2,3"]=2.5
+
+outdat = data.frame(
+ sampleID=dat$caseno,
+ fibreID=dat$Fibre,
+ sbj_type=ifelse(grepl("C",dat$caseno, fixed=TRUE),"control","patient"),
+ Porin=dat$adj_porin,
+ CI=dat$adj_CI,
+ CIV=dat$adj_CIV,
+ CopyNumber=as.numeric(dat$fibre_total_cn),
+ FibreType=as.numeric(dat$fibre_type),
+ FibreType2=as.numeric(dat$fibre_type_2),
+ MutationLoad=as.numeric(dat$fibre_het)
+)
+
+longdat = melt(setDT(outdat),id.vars=c("sampleID","fibreID","sbj_type"),variable.name="channel")
+write.table(longdat,"DataChildsFormat_adj.txt",sep="\t",quote=FALSE,row.names=FALSE)
+
+outdat = data.frame(
+ sampleID=dat$caseno,
+ fibreID=dat$Fibre,
+ sbj_type=ifelse(grepl("C",dat$caseno, fixed=TRUE),"control","patient"),
+ Porin=dat$raw_porin,
+ CI=dat$raw_CI,
+ CIV=dat$raw_CIV,
+ CopyNumber=as.numeric(dat$fibre_total_cn),
+ FibreType=as.numeric(dat$fibre_type),
+ FibreType2=as.numeric(dat$fibre_type_2),
+ MutationLoad=as.numeric(dat$fibre_het)
+)
+
+longdat = melt(setDT(outdat),id.vars=c("sampleID","fibreID","sbj_type"),variable.name="channel")
+write.table(longdat,"DataChildsFormat_raw.txt",sep="\t",quote=FALSE,row.names=FALSE)
+
